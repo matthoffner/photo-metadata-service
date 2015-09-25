@@ -9,8 +9,6 @@ import urllib
 
 app = Flask(__name__)
 
-imagga_url = "https://api.imagga.com"
-
 @app.route('/meta/',methods = ['GET','POST'])
 def get_meta():
 	content = request.json
@@ -19,8 +17,7 @@ def get_meta():
 	f.close()
 	filename = '00000001.jpg'
 	result = get_exif(filename)
-	print result
-	return jsonify(content)
+	return jsonify(result)
 
 def get_exif(fn):
 	ret = {}
@@ -31,13 +28,16 @@ def get_exif(fn):
 		ret[decoded] = value
 	return ret
 
-@app.route('/tags/',methods = ['POST'])
+@app.route('/tags/', methods = ['POST'])
 def get_tags():
+	imagga_url = "http://api.imagga.com/v1/tagging"
 	content = request.json
-	querystring = {"url":content['url'],"version":"2"}
+	print content
+	url = content['url']
+	querystring = {"url":url,"version":"2"}
 	headers = { 'accept': "application/json",'authorization': "Basic YWNjXzM4ZDRkNzgxOGRlYmMwNDoxZWVlZjY0ZThiMWQzMGYxZmRkODgxOTkxOGViOGI1Yg=="}
 	response = requests.request("GET", imagga_url, headers=headers, params=querystring)
-	return jsonify(response)
+	return response.text
 	
 if __name__ == '__main__':
 	app.debug = True
