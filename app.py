@@ -3,91 +3,112 @@ import re, requests, json, codecs
 from urlparse import urlparse
 from bs4 import BeautifulSoup as bs
 from flask import Flask, Response, json, make_response, render_template, request, jsonify
-from PIL import Image
-from PIL.ExifTags import TAGS
 import urllib
+import sys
+import pytz, datetime
+from PIL import Image
+from PIL.ExifTags import TAGS, GPSTAGS
 
-app = Flask(__name__)
+def get_exif_data(image):
+    """Returns a dictionary from the exif data of an PIL Image item. Also converts the GPS Tags"""
+    exif_data = {}
+    info = image._getexif()
+    if info:
+        for tag, value in info.items():
+            decoded = TAGS.get(tag, tag)
+            if decoded == "GPSInfo":
+                print value
+                gps_data = {}
+                for gps_tag in value:
+                    sub_decoded = GPSTAGS.get(gps_tag, gps_tag)
+                    gps_data[sub_decoded] = value[gps_tag]
+                exif_data[decoded] = gps_data
+            else:
+                exif_data[decoded] = value
+    return exif_data
 
-@app.route('/meta/',methods = ['GET','POST'])
-def get_meta():
-	global result
-	content = request.json
-	f = open('00000001.jpg','wb')
-	f.write(urllib.urlopen(content['url']).read())
-	f.close()
-	filename = '00000001.jpg'
-	result = get_lat_long(filename)
-	return jsonify(result)
 
-def _get_if_exist(data, key):
-    if key in data:
-        return data[key]
-		
-    return None
-	
 def _convert_to_degress(value):
     """Helper function to convert the GPS coordinates stored in the EXIF to degress in float format"""
-    d0 = value[0][0]
-    d1 = value[0][1]
-    d = float(d0) / float(d1)
+    deg_num, deg_denom = value[0]
+    d = float(deg_num) / float(deg_denom)
 
-    m0 = value[1][0]
-    m1 = value[1][1]
-    m = float(m0) / float(m1)
+    min_num, min_denom = value[1]
+    m = float(min_num) / float(min_denom)
 
-    s0 = value[2][0]
-    s1 = value[2][1]
-    s = float(s0) / float(s1)
+    sec_num, sec_denom = value[2]
+    s = float(sec_num) / float(sec_denom)
 
     return d + (m / 60.0) + (s / 3600.0)
 
-
-def get_lat_lon(fn):
-
-	exif_data = {}
-	i = Image.open(fn)
-	info = i._getexif()
-	for tag, value in info.items():
-		decoded = TAGS.get(tag, tag)
-		exif_data[decoded] = value
-
-	lat = None
-	lon = None
-	if "GPSInfo" in exif_data:		
-		gps_info = exif_data["GPSInfo"]
-
-	gps_latitude = _get_if_exist(gps_info, "GPSLatitude")
-	gps_latitude_ref = _get_if_exist(gps_info, 'GPSLatitudeRef')
-	gps_longitude = _get_if_exist(gps_info, 'GPSLongitude')
-	gps_longitude_ref = _get_if_exist(gps_info, 'GPSLongitudeRef')
-
-	if gps_latitude and gps_latitude_ref and gps_longitude and gps_longitude_ref:
-		lat = _convert_to_degress(gps_latitude)
-		if gps_latitude_ref != "N":                     
-			lat = 0 - lat
-
-		lon = _convert_to_degress(gps_longitude)
-		if gps_longitude_ref != "E":
-			lon = 0 - lon
-
-	payload = {}
-	payload[lat] = lat
-	payload[lon] = lon
-	return payload
+def get_lat_lon(exif_data):
+    """Returns the latitude and longitude, if available, from the
+    provided exif_data (obtained through get_exif_data above)"""
+    lat = None
+    lon = None
+    if "GPSInfo" in exif_data:
+        gps_info = exif_data["GPSInfo"]
+        gps_latitude = gps_info.get("GPSLatitude")
+        gps_latitude_ref = gps_info.get('GPSLatitudeRef')
+        gps_longitude = gps_info.get('GPSLongitude')
+        gps_longitude_ref = gps_info.get('GPSLongitudeRef')
+        if gps_latitude and gps_latitude_ref and gps_longitude and gps_longitude_ref:
+            lat = _convert_to_degress(gps_latitude)
+            if gps_latitude_ref != "N":
+                lat *= -1
+            lon = _convert_to_degress(gps_longitude)
+            if gps_longitude_ref != "E":
+                lon *= -1
+    return lat, lon
 
 
-@app.route('/tags/', methods = ['POST'])
-def get_tags():
-	imagga_url = "http://api.imagga.com/v1/tagging"
-	content = request.json
-	print content
-	url = content['url']
-	querystring = {"url":url,"version":"2"}
-	headers = { 'accept': "application/json",'authorization': "Basic YWNjXzM4ZDRkNzgxOGRlYmMwNDoxZWVlZjY0ZThiMWQzMGYxZmRkODgxOTkxOGViOGI1Yg=="}
-	response = requests.request("GET", imagga_url, headers=headers, params=querystring)
-	return response.text
+def get_altitude(exif_data):
+    """ extract altitude if avalaible from the
+    provided exif_data (obtained through get_exif_data above)"""
+    alt = None
+    if "GPSInfo" in exif_data:
+        gps_info = exif_data["GPSInfo"]
+        gps_altitude = gps_info.get('GPSAltitude')
+        gps_altitude_ref = gps_info.get('GPSAltitudeRef')
+        if gps_altitude:
+            alt = float(gps_altitude[0]) / float(gps_altitude[1])
+            if gps_altitude_ref == 1:
+                alt *=-1
+    return alt
+
+def get_timestamp(exif_data):
+    """ extract the timestamp if avalaible as datetime  from the
+    provided exif_data (obtained through get_exif_data above)"""
+    dt = None
+    utc = pytz.utc
+    if "GPSInfo" in exif_data:
+        gps_info = exif_data["GPSInfo"]
+        gps_time_stamp = gps_info.get('GPSTimeStamp')
+        if 'GPSDateStamp' in gps_info:
+            gps_date = [int(i) for i in gps_info['GPSDateStamp'].split(':')]
+        elif 29 in gps_info:
+            gps_date = [int(i) for i in gps_info[29].split(':')]
+        else:
+            gps_date = None
+        if gps_time_stamp and gps_date:
+            yy = gps_date[0]
+            mm = gps_date[1]
+            dd = gps_date[2]
+            h = int(float(gps_time_stamp[0][0]) / float(gps_time_stamp[0][1]))
+            m = int(float(gps_time_stamp[1][0]) / float(gps_time_stamp[1][1]))
+            s = int(float(gps_time_stamp[2][0]) / float(gps_time_stamp[2][1]))
+            dt = utc.localize(datetime.datetime(yy,mm,dd,h,m,s))
+    return dt
+
 	
 if __name__ == '__main__':
-	app.debug = True
-	app.run()
+	if len(sys.argv) < 2:
+		print "Error! No image file specified!"
+		print "Usage: %s <filename>" % sys.argv[0]
+		sys.exit(1)
+	image = Image.open(sys.argv[1])
+	exif_data = get_exif_data(image)
+	lat,long = get_lat_lon(exif_data)
+	print lat,long
+	timestamp = get_timestamp(exif_data)
+	print timestamp
