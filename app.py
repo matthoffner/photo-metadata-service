@@ -9,9 +9,9 @@ import urllib
 
 app = Flask(__name__)
 
-imagga_url = ""
+imagga_url = "https://api.imagga.com"
 
-@app.route('/images/',methods = ['GET','POST'])
+@app.route('/meta/',methods = ['GET','POST'])
 def get_meta():
 	content = request.json
 	f = open('00000001.jpg','wb')
@@ -31,7 +31,7 @@ def get_exif(fn):
 		ret[decoded] = value
 	return ret
 
-@app.route('/tags/',methods = ['POST']
+@app.route('/tags/',methods = ['POST'])
 def get_tags():
 	content = request.json
 	querystring = {"url":content['url'],"version":"2"}

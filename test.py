@@ -3,7 +3,15 @@ import json
 from multiprocessing import Pool
 
 def extract(image_url):
-	source = requests.post("http://localhost:5000/images/",data=json.dumps({'url': image_url}),headers={'Content-Type': 'application/json'})
+	exif = photo_metadata(image_url)
+	tags = photo_tags(image_url)
+
+def photo_metadata(image_url):
+	source = requests.post("http://localhost:5000/meta/",data=json.dumps({'url': image_url}),headers={'Content-Type': 'application/json'})
+	print source.content
+
+def photo_tags(image_url):
+	source = requests.post("http://localhost:5000/tags/",data=json.dumps({'url': image_url}),headers={'Content-Type': 'application/json'})
 	print source.content
 
 if __name__ == '__main__':
