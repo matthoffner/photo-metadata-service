@@ -6,6 +6,7 @@ from flask import Flask, Response, json, make_response, render_template, request
 import urllib
 import sys
 import pytz, datetime
+from pygeocoder import Geocoder
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
@@ -17,7 +18,6 @@ def get_exif_data(image):
         for tag, value in info.items():
             decoded = TAGS.get(tag, tag)
             if decoded == "GPSInfo":
-                print value
                 gps_data = {}
                 for gps_tag in value:
                     sub_decoded = GPSTAGS.get(gps_tag, gps_tag)
@@ -59,7 +59,10 @@ def get_lat_lon(exif_data):
             lon = _convert_to_degress(gps_longitude)
             if gps_longitude_ref != "E":
                 lon *= -1
-    return lat, lon
+    payload = {}
+    payload['lat'] = lat
+    payload['lon'] = lon
+    return payload
 
 
 def get_altitude(exif_data):
@@ -75,6 +78,11 @@ def get_altitude(exif_data):
             if gps_altitude_ref == 1:
                 alt *=-1
     return alt
+
+def reverse_geocode(coordinates):
+	results = Geocoder.reverse_geocode(coordinates['lat'],coordinates['lon'])
+	return results
+
 
 def get_timestamp(exif_data):
     """ extract the timestamp if avalaible as datetime  from the
@@ -108,7 +116,9 @@ if __name__ == '__main__':
 		sys.exit(1)
 	image = Image.open(sys.argv[1])
 	exif_data = get_exif_data(image)
-	lat,long = get_lat_lon(exif_data)
-	print lat,long
+	coordinates = get_lat_lon(exif_data)
+	print coordinates
 	timestamp = get_timestamp(exif_data)
 	print timestamp
+	address = reverse_geocode(coordinates)
+	print address
