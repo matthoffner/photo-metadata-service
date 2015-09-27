@@ -23,11 +23,14 @@ def extract_photo():
 	filename = '00000001.jpg'
 	image = Image.open(filename)
 	exif_data = get_exif_data(image)
-	payload['coordinates'] = get_lat_lon(exif_data)
-	payload['timestamp'] = get_timestamp(exif_data)
-	payload['address'] = reverse_geocode(coordinates)
+	coordinates = get_lat_lon(exif_data)
+	payload['coordinates'] = str(coordinates)
+	timestamp = get_timestamp(exif_data)
+	payload['timestamp'] = str(timestamp)
+	address = reverse_geocode(coordinates)
+	payload['address'] = str(address)
 	print payload
-	return payload
+	return jsonify(payload)
 
 
 def get_exif_data(image):
@@ -125,7 +128,6 @@ if __name__ == '__main__':
 		print "Launching service..."
 		app.debug = True
 		app.run()
-		sys.exit(1)
 	image = Image.open(sys.argv[1])
 	exif_data = get_exif_data(image)
 	coordinates = get_lat_lon(exif_data)
