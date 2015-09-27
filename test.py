@@ -1,5 +1,6 @@
 import requests
 import json
+from inspiration import query_pinterest
 from multiprocessing import Pool
 
 def extract(image_url):
@@ -17,6 +18,8 @@ def photo_tags(image_url):
 if __name__ == '__main__':
 	p = Pool(1)
 	#flat_file = "image_links.csv"
+	yolo = query_pinterest(query_term='Porch')
 	#image_url = [line for line in flat_file]
-	image_url = ["http://www.findexif.com/client/samples/iguana.jpg"]
-	p.map(extract,image_url)
+	#image_url = ["http://www.findexif.com/client/samples/iguana.jpg"]
+	print yolo
+	p.map(extract,yolo)
