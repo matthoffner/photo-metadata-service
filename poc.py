@@ -10,8 +10,27 @@ from pygeocoder import Geocoder
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 
+app = Flask(__name__)
+
+
+@app.route('/images/',methods = ['GET','POST'])
+def extract_photo():
+	payload = {}
+	content = request.json
+	f = open('00000001.jpg','wb')
+	f.write(urllib.urlopen(content['url']).read())
+	f.close()
+	filename = '00000001.jpg'
+	image = Image.open(filename)
+	exif_data = get_exif_data(image)
+	payload['coordinates'] = get_lat_lon(exif_data)
+	payload['timestamp'] = get_timestamp(exif_data)
+	payload['address'] = reverse_geocode(coordinates)
+	print payload
+	return payload
+
+
 def get_exif_data(image):
-    """Returns a dictionary from the exif data of an PIL Image item. Also converts the GPS Tags"""
     exif_data = {}
     info = image._getexif()
     if info:
@@ -29,7 +48,6 @@ def get_exif_data(image):
 
 
 def _convert_to_degress(value):
-    """Helper function to convert the GPS coordinates stored in the EXIF to degress in float format"""
     deg_num, deg_denom = value[0]
     d = float(deg_num) / float(deg_denom)
 
@@ -42,8 +60,6 @@ def _convert_to_degress(value):
     return d + (m / 60.0) + (s / 3600.0)
 
 def get_lat_lon(exif_data):
-    """Returns the latitude and longitude, if available, from the
-    provided exif_data (obtained through get_exif_data above)"""
     lat = None
     lon = None
     if "GPSInfo" in exif_data:
@@ -66,8 +82,6 @@ def get_lat_lon(exif_data):
 
 
 def get_altitude(exif_data):
-    """ extract altitude if avalaible from the
-    provided exif_data (obtained through get_exif_data above)"""
     alt = None
     if "GPSInfo" in exif_data:
         gps_info = exif_data["GPSInfo"]
@@ -83,10 +97,7 @@ def reverse_geocode(coordinates):
 	results = Geocoder.reverse_geocode(coordinates['lat'],coordinates['lon'])
 	return results
 
-
 def get_timestamp(exif_data):
-    """ extract the timestamp if avalaible as datetime  from the
-    provided exif_data (obtained through get_exif_data above)"""
     dt = None
     utc = pytz.utc
     if "GPSInfo" in exif_data:
@@ -111,8 +122,9 @@ def get_timestamp(exif_data):
 	
 if __name__ == '__main__':
 	if len(sys.argv) < 2:
-		print "Error! No image file specified!"
-		print "Usage: %s <filename>" % sys.argv[0]
+		print "Launching service..."
+		app.debug = True
+		app.run()
 		sys.exit(1)
 	image = Image.open(sys.argv[1])
 	exif_data = get_exif_data(image)
