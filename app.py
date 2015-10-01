@@ -158,7 +158,7 @@ def final(name):
 
 @app.route('/<name>/')
 def name(name):
-    fb = firebase.FirebaseApplication('https://memory-pool.firebaseio.com', None)
+    fb = firebase.FirebaseApplication('https://photo-metadata-service.firebaseio.com', None)
     result = fb.get('/', None)
     if name not in result:
         redirect('/%s/setup/'%name)
