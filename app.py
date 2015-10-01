@@ -118,7 +118,7 @@ def index():
 @app.route('/create', methods=["POST"])
 def create():
     text = request.form['text']
-    fb = firebase.FirebaseApplication('https://memory-pool.firebaseio.com', None)
+    fb = firebase.FirebaseApplication('https://photo-metadata-service.firebaseio.com', None)
     result = fb.get('/', None)
     if text in result:
         return redirect("%s"%text)
@@ -128,7 +128,7 @@ def create():
 @app.route('/<name>/setup')
 def setup(name):
     if request.method == 'GET':
-        fb = firebase.FirebaseApplication('https://memory-pool.firebaseio.com', None)
+        fb = firebase.FirebaseApplication('https://photo-metadata-service.firebaseio.com', None)
         result = fb.get('/', None)
         if name in result:
             return redirect("%s"%name)
